@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.no99.edunexusnotification_and_communication.mapper.NotificationMapper">
+
+    <!-- Result Map -->
+    <resultMap id="NotificationResultMap" type="com.no99.edunexusnotification_and_communication.entity.Notification">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="title" column="title"/>
+        <result property="content" column="content"/>
+        <result property="type" column="type"
+                typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+        <result property="priority" column="priority"
+                typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+        <result property="isRead" column="is_read"/>
+        <result property="readAt" column="read_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="expiresAt" column="expires_at"/>
+        <result property="metadata" column="metadata"
+                typeHandler="com.no99.edunexusnotification_and_communication.config.JsonTypeHandler"/>
+    </resultMap>
+
+    <!-- Insert -->
+    <insert id="insert" parameterType="com.no99.edunexusnotification_and_communication.entity.Notification"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO notifications (
+            user_id, title, content, type, priority,
+            is_read, expires_at, metadata, created_at, updated_at
+        ) VALUES (
+            #{userId}, #{title}, #{content}, #{type}, #{priority},
+            #{isRead}, #{expiresAt},
+            #{metadata, typeHandler=com.no99.edunexusnotification_and_communication.config.JsonTypeHandler},
+            NOW(), NOW()
+        )
+    </insert>
+
+    <!-- Update -->
+    <update id="update" parameterType="com.no99.edunexusnotification_and_communication.entity.Notification">
+        UPDATE notifications
+        SET user_id = #{userId},
+            title = #{title},
+            content = #{content},
+            type = #{type},
+            priority = #{priority},
+            is_read = #{isRead},
+            read_at = #{readAt},
+            expires_at = #{expiresAt},
+            metadata = #{metadata, typeHandler=com.no99.edunexusnotification_and_communication.config.JsonTypeHandler},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- Delete by ID -->
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM notifications WHERE id = #{id}
+    </delete>
+
+    <!-- Find by ID -->
+    <select id="findById" parameterType="long" resultMap="NotificationResultMap">
+        SELECT * FROM notifications WHERE id = #{id}
+    </select>
+
+    <!-- Find by User ID -->
+    <select id="findByUserId" parameterType="int" resultMap="NotificationResultMap">
+        SELECT * FROM notifications
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- Find Unread by User ID -->
+    <select id="findUnreadByUserId" parameterType="int" resultMap="NotificationResultMap">
+        SELECT * FROM notifications
+        WHERE user_id = #{userId} AND is_read = 0
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- Find All -->
+    <select id="findAll" resultMap="NotificationResultMap">
+        SELECT * FROM notifications
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- Mark as Read -->
+    <update id="markAsRead" parameterType="long">
+        UPDATE notifications
+        SET is_read = 1, read_at = NOW(), updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- Mark All as Read by User ID -->
+    <update id="markAllAsReadByUserId" parameterType="int">
+        UPDATE notifications
+        SET is_read = 1, read_at = NOW(), updated_at = NOW()
+        WHERE user_id = #{userId} AND is_read = 0
+    </update>
+
+    <!-- Count Unread by User ID -->
+    <select id="countUnreadByUserId" parameterType="int" resultType="int">
+        SELECT COUNT(*) FROM notifications
+        WHERE user_id = #{userId} AND is_read = 0
+    </select>
+
+    <!-- Delete Expired -->
+    <delete id="deleteExpired">
+        DELETE FROM notifications
+        WHERE expires_at IS NOT NULL AND expires_at &lt; NOW()
+    </delete>
+
+    <!-- Find by User ID and Type -->
+    <select id="findByUserIdAndType" resultMap="NotificationResultMap">
+        SELECT * FROM notifications
+        WHERE user_id = #{userId} AND type = #{type}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- Find by User ID and Priority -->
+    <select id="findByUserIdAndPriority" resultMap="NotificationResultMap">
+        SELECT * FROM notifications
+        WHERE user_id = #{userId} AND priority = #{priority}
+        ORDER BY created_at DESC
+    </select>
+
+</mapper>
+

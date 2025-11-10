@@ -3,6 +3,7 @@ package com.no99.edunexusnotification_and_communication.controller;
 import com.no99.edunexusnotification_and_communication.dto.ApiResponse;
 import com.no99.edunexusnotification_and_communication.dto.NotificationRequest;
 import com.no99.edunexusnotification_and_communication.entity.Notification;
+import com.no99.edunexusnotification_and_communication.service.NotificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -11,28 +12,23 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Notification REST Controller (Simplified Version)
+ * Notification REST Controller
  */
 @RestController
 @RequestMapping("/api/notifications")
 @Tag(name = "Notification Management", description = "APIs for managing notifications in EduNexus platform")
 public class NotificationController {
 
-    // In-memory storage for demo purposes
-    private final Map<Long, Notification> notifications = new HashMap<>();
-    private final AtomicLong idGenerator = new AtomicLong(1);
+    @Autowired
+    private NotificationService notificationService;
 
     /**
      * Create a new notification
@@ -51,7 +47,6 @@ public class NotificationController {
             @Valid @RequestBody NotificationRequest request) {
         try {
             Notification notification = new Notification();
-            notification.setId(idGenerator.getAndIncrement());
             notification.setUserId(request.getUserId());
             notification.setTitle(request.getTitle());
             notification.setContent(request.getContent());
@@ -59,14 +54,11 @@ public class NotificationController {
             notification.setPriority(request.getPriority());
             notification.setExpiresAt(request.getExpiresAt());
             notification.setMetadata(request.getMetadata());
-            notification.setIsRead(false);
-            notification.setCreatedAt(LocalDateTime.now());
-            notification.setUpdatedAt(LocalDateTime.now());
 
-            notifications.put(notification.getId(), notification);
+            Notification created = notificationService.createNotification(notification);
 
             return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(ApiResponse.success(notification, "Notification created successfully"));
+                    .body(ApiResponse.success(created, "Notification created successfully"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponse.error("Failed to create notification: " + e.getMessage()));
@@ -89,7 +81,7 @@ public class NotificationController {
             @Parameter(description = "Notification ID", required = true, example = "1")
             @PathVariable Long id) {
         try {
-            Notification notification = notifications.get(id);
+            Notification notification = notificationService.getNotificationById(id);
             if (notification == null) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(ApiResponse.error("Notification not found"));
@@ -117,12 +109,7 @@ public class NotificationController {
             @Parameter(description = "User ID", required = true, example = "123")
             @PathVariable Integer userId) {
         try {
-            List<Notification> userNotifications = new ArrayList<>();
-            for (Notification notification : notifications.values()) {
-                if (notification.getUserId().equals(userId)) {
-                    userNotifications.add(notification);
-                }
-            }
+            List<Notification> userNotifications = notificationService.getNotificationsByUserId(userId);
             return ResponseEntity.ok(ApiResponse.success(userNotifications));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -146,15 +133,12 @@ public class NotificationController {
             @Parameter(description = "Notification ID", required = true, example = "1")
             @PathVariable Long id) {
         try {
-            Notification notification = notifications.get(id);
-            if (notification == null) {
+            boolean success = notificationService.markNotificationAsRead(id);
+            if (!success) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(ApiResponse.error("Notification not found"));
             }
 
-            notification.setIsRead(true);
-            notification.setReadAt(LocalDateTime.now());
-            notification.setUpdatedAt(LocalDateTime.now());
 
             return ResponseEntity.ok(ApiResponse.success(null, "Notification marked as read"));
         } catch (Exception e) {
@@ -179,8 +163,8 @@ public class NotificationController {
             @Parameter(description = "Notification ID", required = true, example = "1")
             @PathVariable Long id) {
         try {
-            Notification notification = notifications.remove(id);
-            if (notification == null) {
+            boolean success = notificationService.deleteNotification(id);
+            if (!success) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(ApiResponse.error("Notification not found"));
             }
@@ -205,11 +189,83 @@ public class NotificationController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<Notification>>> getAllNotifications() {
         try {
-            List<Notification> allNotifications = new ArrayList<>(notifications.values());
+            List<Notification> allNotifications = notificationService.getAllNotifications();
             return ResponseEntity.ok(ApiResponse.success(allNotifications));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponse.error("Failed to get notifications: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Get unread notifications for a user
+     */
+    @Operation(summary = "Get unread notifications for a user",
+               description = "Retrieves all unread notifications for a specific user")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Unread notifications retrieved successfully",
+                    content = @Content(schema = @Schema(implementation = com.no99.edunexusnotification_and_communication.dto.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid user ID",
+                    content = @Content(schema = @Schema(implementation = com.no99.edunexusnotification_and_communication.dto.ApiResponse.class)))
+    })
+    @GetMapping("/user/{userId}/unread")
+    public ResponseEntity<ApiResponse<List<Notification>>> getUnreadNotifications(
+            @Parameter(description = "User ID", required = true, example = "123")
+            @PathVariable Integer userId) {
+        try {
+            List<Notification> unreadNotifications = notificationService.getUnreadNotificationsByUserId(userId);
+            return ResponseEntity.ok(ApiResponse.success(unreadNotifications));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error("Failed to get unread notifications: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Mark all notifications as read for a user
+     */
+    @Operation(summary = "Mark all notifications as read for a user",
+               description = "Marks all notifications as read for a specific user")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "All notifications marked as read successfully",
+                    content = @Content(schema = @Schema(implementation = com.no99.edunexusnotification_and_communication.dto.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid user ID",
+                    content = @Content(schema = @Schema(implementation = com.no99.edunexusnotification_and_communication.dto.ApiResponse.class)))
+    })
+    @PutMapping("/user/{userId}/read-all")
+    public ResponseEntity<ApiResponse<Void>> markAllAsRead(
+            @Parameter(description = "User ID", required = true, example = "123")
+            @PathVariable Integer userId) {
+        try {
+            notificationService.markAllNotificationsAsRead(userId);
+            return ResponseEntity.ok(ApiResponse.success(null, "All notifications marked as read"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error("Failed to mark all notifications as read: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Count unread notifications for a user
+     */
+    @Operation(summary = "Count unread notifications for a user",
+               description = "Returns the count of unread notifications for a specific user")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Unread count retrieved successfully",
+                    content = @Content(schema = @Schema(implementation = com.no99.edunexusnotification_and_communication.dto.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid user ID",
+                    content = @Content(schema = @Schema(implementation = com.no99.edunexusnotification_and_communication.dto.ApiResponse.class)))
+    })
+    @GetMapping("/user/{userId}/unread-count")
+    public ResponseEntity<ApiResponse<Integer>> getUnreadCount(
+            @Parameter(description = "User ID", required = true, example = "123")
+            @PathVariable Integer userId) {
+        try {
+            int count = notificationService.countUnreadNotifications(userId);
+            return ResponseEntity.ok(ApiResponse.success(count));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error("Failed to get unread count: " + e.getMessage()));
         }
     }
 }
