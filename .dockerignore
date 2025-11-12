@@ -1,0 +1,47 @@
+# 忽略不需要复制到Docker镜像的文件和目录
+target/
+!target/*.jar
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# 日志文件
+logs/
+*.log
+
+# 测试文件
+*.test
+
+# Git
+.git/
+.gitignore
+
+# 文档
+*.md
+HELP.md
+README.md
+
+# 依赖树
+dependency-tree.txt
+
+# Docker文件
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
