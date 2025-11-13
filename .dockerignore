@@ -35,7 +35,6 @@ README.md
 dependency-tree.txt
 
 # Docker文件
-Dockerfile
 docker-compose.yml
 .dockerignore
 
